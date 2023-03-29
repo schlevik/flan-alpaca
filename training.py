@@ -98,7 +98,7 @@ def init_args(raw_args):
     parser.add_argument("--lora_r", type=int, default=8)
     parser.add_argument("--lora_alpha", type=int, default=16)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
-    parser.add_argument("--lora_alpha", type=int, default=16)
+    #parser.add_argument("--lora_alpha", type=int, default=16)
     
     
     #     lora_r: int = 8,
@@ -130,7 +130,8 @@ class LightningModel(pl.LightningModule):
             lora_alpha=hparams.lora_alpha,
             #target_modules=hparams.lora_target_modules,
             lora_dropout=hparams.lora_dropout,
-            bias="none",
+            inference_mode=False,
+            #bias="none",
             task_type=TaskType.SEQ_2_SEQ_LM,
         )
         self.model = get_peft_model(self.model, config)
