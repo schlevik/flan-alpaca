@@ -3,4 +3,6 @@ pydantic==1.10.6
 pytorch-lightning==2.0.0
 torch==2.0.0
 tqdm==4.65.0
-transformers==4.27.1
+bitsandbytes
+git+https://github.com/huggingface/peft.git
+git+https://github.com/huggingface/transformers.git
