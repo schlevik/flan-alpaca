@@ -15,7 +15,6 @@ def test_model(
     base_model: str,
     adapter_weights: str,
     prompt: str = "",
-    max_length: int = 160,
     load_in_8bit: bool = False,
     device: str = "cuda",
     temperature: float = 1.0,
