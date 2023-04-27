@@ -21,6 +21,15 @@ from transformers.models.t5.modeling_t5 import T5Block
 
 from data_loading import TextToTextDataset
 
+from peft import (  # noqa: E402
+    LoraConfig,
+    get_peft_model,
+    get_peft_model_state_dict,
+    prepare_model_for_int8_training,
+    set_peft_model_state_dict,
+    TaskType
+)
+
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
@@ -88,6 +97,19 @@ def init_args(raw_args):
     parser.add_argument("--use_fsdp", action="store_true")
     parser.add_argument("--use_lora", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--lora_r", type=int, default=8)
+    parser.add_argument("--lora_alpha", type=int, default=16)
+    parser.add_argument("--lora_dropout", type=float, default=0.05)
+    #parser.add_argument("--lora_alpha", type=int, default=16)
+    
+    
+    #     lora_r: int = 8,
+    # lora_alpha: int = 16,
+    # lora_dropout: float = 0.05,
+    # lora_target_modules: List[str] = [
+    #     "q_proj",
+    #     "v_proj",
+    # ],
 
     args = parser.parse_args(raw_args)
     return args
@@ -99,8 +121,22 @@ class LightningModel(pl.LightningModule):
         self.save_hyperparameters(hparams)
         print(self.hparams)
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.hparams.model_name_or_path
+            self.hparams.model_name_or_path,
+            load_in_8bit=True,
+            device_map='auto'
         )
+        self.model = prepare_model_for_int8_training(self.model)
+
+        config = LoraConfig(
+            r=hparams.lora_r,
+            lora_alpha=hparams.lora_alpha,
+            #target_modules=hparams.lora_target_modules,
+            lora_dropout=hparams.lora_dropout,
+            inference_mode=False,
+            #bias="none",
+            task_type=TaskType.SEQ_2_SEQ_LM,
+        )
+        self.model = get_peft_model(self.model, config)
         print(dict(orig_state_dict=len(self.model.state_dict())))
         if self.hparams.use_lora:
             # https://github.com/huggingface/peft/blob/main/examples/conditional_generation/peft_lora_seq2seq.ipynb
@@ -236,6 +272,22 @@ def main(raw_args=None):
 
     trainer.fit(model)
 
+    model = model.model
+    
+    model.config.use_cache = False
+
+    old_state_dict = model.state_dict
+    model.state_dict = (
+        lambda self, *_, **__: get_peft_model_state_dict(
+            self, old_state_dict()
+        )
+    ).__get__(model, type(model))
+
+    model.save_pretrained(output_dir)
+
+    print(
+        "\n If there's a warning about missing keys above, please disregard :)"
+    )
 
 """
 p training.py --output_dir outputs/model/base
